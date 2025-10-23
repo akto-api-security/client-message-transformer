@@ -1,0 +1,72 @@
+# Default values for transformer
+replicaCount: 1
+
+# Image Configuration - Public ECR
+# Format: public.ecr.aws/<registry-alias>/client-message-transformer
+image:
+  repository: "public.ecr.aws/akto-api-security/client-message-transformer"
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: transformer
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Kafka Configuration (matches .env file)
+kafka:
+  source:
+    brokers: "localhost:9092"
+    topic: "client-messages"
+  destination:
+    brokers: "localhost:9093"
+    topic: "akto.api.logs"
+  consumerGroup: "message-transformer-group"
+
+# Client Configuration (matches .env file)
+client:
+  id: "1000000"
+
+# Logging (matches .env file)
+logging:
+  level: "INFO"
+
+# Restart policy
+restartPolicy: Always
