@@ -54,8 +54,6 @@ Dockerfile
 .dockerignore
 
 # Kubernetes
-*.yaml
-*.yml
 k8s/
 
 # Backup files

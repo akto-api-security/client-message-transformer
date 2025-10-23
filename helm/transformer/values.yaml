@@ -4,7 +4,7 @@ replicaCount: 1
 # Image Configuration - Public ECR
 # Format: public.ecr.aws/<registry-alias>/client-message-transformer
 image:
-  repository: "public.ecr.aws/akto-api-security/client-message-transformer"
+  repository: "public.ecr.aws/aktosecurity/client-message-transformer"
   tag: latest
   pullPolicy: IfNotPresent
 
