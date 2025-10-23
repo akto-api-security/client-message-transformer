@@ -1,0 +1,69 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.so.*
+*.dylib
+transformer
+transformer-old
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
+
+# Dependency directories (remove the comment below to include it)
+vendor/
+
+# Go workspace file
+go.work
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.bak
+temp/
+
+# Shell scripts
+*.sh
+
+# Build artifacts
+dist/
+build/
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Kubernetes
+*.yaml
+*.yml
+k8s/
+
+# Backup files
+*.backup
+*.orig
+
+# Old/monolithic versions (keep while migrating)
+scripts/kafka-transformer.go.bak
+scripts/kafka-transformer.go.old
