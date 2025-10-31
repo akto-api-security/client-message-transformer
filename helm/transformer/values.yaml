@@ -55,9 +55,23 @@ kafka:
   source:
     brokers: "localhost:9092"
     topic: "client-messages"
+    # SASL Authentication for Source Kafka
+    sasl:
+      enabled: false
+      mechanism: "PLAIN"  # Options: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512
+      username: ""
+      password: ""
+      securityProtocol: "SASL_PLAINTEXT"  # Options: SASL_PLAINTEXT, SASL_SSL
   destination:
     brokers: "localhost:9093"
     topic: "akto.api.logs"
+    # SASL Authentication for Destination Kafka
+    sasl:
+      enabled: false
+      mechanism: "PLAIN"  # Options: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512
+      username: ""
+      password: ""
+      securityProtocol: "SASL_PLAINTEXT"  # Options: SASL_PLAINTEXT, SASL_SSL
   consumerGroup: "message-transformer-group"
 
 # Client Configuration (matches .env file)

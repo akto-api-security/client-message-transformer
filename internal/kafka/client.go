@@ -9,14 +9,19 @@ import (
 
 // ClientConfig holds Kafka client configuration
 type ClientConfig struct {
-	Brokers       string
-	ConsumerGroup string
-	Topic         string
+	Brokers          string
+	ConsumerGroup    string
+	Topic            string
+	SASLEnabled      bool
+	SASLMechanism    string
+	SASLUsername     string
+	SASLPassword     string
+	SecurityProtocol string
 }
 
 // NewConsumer creates a new Kafka consumer
 func NewConsumer(config *ClientConfig) (*kafka.Consumer, error) {
-	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
+	configMap := &kafka.ConfigMap{
 		"bootstrap.servers":               config.Brokers,
 		"group.id":                        config.ConsumerGroup,
 		"auto.offset.reset":               "earliest",
@@ -28,7 +33,21 @@ func NewConsumer(config *ClientConfig) (*kafka.Consumer, error) {
 		"reconnect.backoff.ms":            100,
 		"reconnect.backoff.max.ms":        10000,
 		"metadata.max.age.ms":             300000,
-	})
+	}
+
+	// Add SASL configuration if enabled
+	if config.SASLEnabled {
+		configMap.SetKey("security.protocol", config.SecurityProtocol)
+		configMap.SetKey("sasl.mechanism", config.SASLMechanism)
+		configMap.SetKey("sasl.username", config.SASLUsername)
+		configMap.SetKey("sasl.password", config.SASLPassword)
+		fmt.Printf("🔐 Consumer SASL Config: protocol=%s, mechanism=%s, username=%s\n",
+			config.SecurityProtocol, config.SASLMechanism, config.SASLUsername)
+	} else {
+		fmt.Printf("⚠️  Consumer SASL DISABLED\n")
+	}
+
+	consumer, err := kafka.NewConsumer(configMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create consumer: %w", err)
 	}
@@ -37,13 +56,13 @@ func NewConsumer(config *ClientConfig) (*kafka.Consumer, error) {
 }
 
 // NewProducer creates a new Kafka producer with retry logic
-func NewProducer(brokers string) (*kafka.Producer, error) {
+func NewProducer(config *ClientConfig) (*kafka.Producer, error) {
 	maxRetries := 5
 	retryDelay := time.Second * 3
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		producer, err := kafka.NewProducer(&kafka.ConfigMap{
-			"bootstrap.servers":                     brokers,
+		configMap := &kafka.ConfigMap{
+			"bootstrap.servers":                     config.Brokers,
 			"acks":                                  "all",
 			"retries":                               10,
 			"max.in.flight.requests.per.connection": 5,
@@ -54,9 +73,23 @@ func NewProducer(brokers string) (*kafka.Producer, error) {
 			"reconnect.backoff.max.ms":              10000,
 			"metadata.max.age.ms":                   300000,
 			"delivery.timeout.ms":                   300000,
-		})
+		}
+
+		// Add SASL configuration if enabled
+		if config.SASLEnabled {
+			configMap.SetKey("security.protocol", config.SecurityProtocol)
+			configMap.SetKey("sasl.mechanism", config.SASLMechanism)
+			configMap.SetKey("sasl.username", config.SASLUsername)
+			configMap.SetKey("sasl.password", config.SASLPassword)
+			fmt.Printf("🔐 Producer SASL Config: protocol=%s, mechanism=%s, username=%s\n",
+				config.SecurityProtocol, config.SASLMechanism, config.SASLUsername)
+		} else {
+			fmt.Printf("⚠️  Producer SASL DISABLED\n")
+		}
+
+		producer, err := kafka.NewProducer(configMap)
 		if err == nil {
-			fmt.Printf("✅ Producer connected to %s\n", brokers)
+			fmt.Printf("✅ Producer connected to %s\n", config.Brokers)
 			return producer, nil
 		}
 

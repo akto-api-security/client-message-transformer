@@ -51,9 +51,14 @@ func New(cfg *config.Config) (*TransformerService, error) {
 
 	// Create consumer
 	consumerCfg := &kafka.ClientConfig{
-		Brokers:       cfg.SourceBrokers,
-		ConsumerGroup: cfg.ConsumerGroup,
-		Topic:         cfg.SourceTopic,
+		Brokers:          cfg.SourceBrokers,
+		ConsumerGroup:    cfg.ConsumerGroup,
+		Topic:            cfg.SourceTopic,
+		SASLEnabled:      cfg.SourceSASLEnabled,
+		SASLMechanism:    cfg.SourceSASLMechanism,
+		SASLUsername:     cfg.SourceSASLUsername,
+		SASLPassword:     cfg.SourceSASLPassword,
+		SecurityProtocol: cfg.SourceSecurityProtocol,
 	}
 	log.Info(fmt.Sprintf("� Attempting to connect to source broker: %s", cfg.SourceBrokers))
 	consumer, err := kafka.NewConsumer(consumerCfg)
@@ -65,7 +70,15 @@ func New(cfg *config.Config) (*TransformerService, error) {
 
 	// Create producer
 	log.Info(fmt.Sprintf("� Attempting to connect to destination broker: %s", cfg.DestinationBrokers))
-	producer, err := kafka.NewProducer(cfg.DestinationBrokers)
+	producerCfg := &kafka.ClientConfig{
+		Brokers:          cfg.DestinationBrokers,
+		SASLEnabled:      cfg.DestinationSASLEnabled,
+		SASLMechanism:    cfg.DestinationSASLMechanism,
+		SASLUsername:     cfg.DestinationSASLUsername,
+		SASLPassword:     cfg.DestinationSASLPassword,
+		SecurityProtocol: cfg.DestinationSecurityProtocol,
+	}
+	producer, err := kafka.NewProducer(producerCfg)
 	if err != nil {
 		log.Error(fmt.Sprintf("❌ Failed to create producer: %v", err))
 		consumer.Close()
