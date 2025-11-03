@@ -49,9 +49,6 @@ temp/
 dist/
 build/
 
-# Docker
-Dockerfile
-.dockerignore
 
 # Kubernetes
 k8s/
