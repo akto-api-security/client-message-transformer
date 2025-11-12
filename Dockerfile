@@ -1,6 +1,6 @@
 # Use a glibc-based Go image for the builder stage
 # Note: We use the target platform directly to avoid cross-compilation issues with CGO + librdkafka
-FROM golang:1.21 AS builder
+FROM golang:1.23 AS builder
 
 # Build arguments for target platform
 ARG TARGETOS=linux
