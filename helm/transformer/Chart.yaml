@@ -2,8 +2,8 @@ apiVersion: v2
 name: transformer
 description: A Helm chart for Kafka Message Transformer service
 type: application
-version: 1.0.1
-appVersion: "1.0.1"
+version: 1.0.2
+appVersion: "1.0.2"
 maintainers:
   - name: Akto API Security
 keywords:
