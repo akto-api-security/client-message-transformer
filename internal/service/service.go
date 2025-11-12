@@ -13,17 +13,19 @@ import (
 	"time"
 
 	kafkalib "github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"google.golang.org/protobuf/proto"
 )
 
 // TransformerService handles message transformation
 type TransformerService struct {
-	config   *config.Config
-	consumer *kafkalib.Consumer
-	producer *kafkalib.Producer
-	logger   *logger.Logger
-	metrics  *metrics.Metrics
-	stopChan chan bool
-	wg       sync.WaitGroup
+	config        *config.Config
+	consumer      *kafkalib.Consumer
+	producer      *kafkalib.Producer
+	protoProducer *kafkalib.Producer // Second producer for proto messages
+	logger        *logger.Logger
+	metrics       *metrics.Metrics
+	stopChan      chan bool
+	wg            sync.WaitGroup
 }
 
 // New creates a new transformer service
@@ -86,13 +88,25 @@ func New(cfg *config.Config) (*TransformerService, error) {
 	}
 	log.Info("✅ Producer connected to destination broker successfully")
 
+	// Create second producer for proto messages (same broker, different topic)
+	log.Info("🚀 Creating second producer for proto messages (akto.api.logs2)")
+	protoProducer, err := kafka.NewProducer(producerCfg)
+	if err != nil {
+		log.Error(fmt.Sprintf("❌ Failed to create proto producer: %v", err))
+		consumer.Close()
+		producer.Close()
+		return nil, err
+	}
+	log.Info("✅ Proto producer created successfully")
+
 	service := &TransformerService{
-		config:   cfg,
-		consumer: consumer,
-		producer: producer,
-		logger:   log,
-		metrics:  metrics.New(),
-		stopChan: make(chan bool),
+		config:        cfg,
+		consumer:      consumer,
+		producer:      producer,
+		protoProducer: protoProducer,
+		logger:        log,
+		metrics:       metrics.New(),
+		stopChan:      make(chan bool),
 	}
 
 	log.Info("")
@@ -217,12 +231,25 @@ func (s *TransformerService) processMessage(kafkaMsg *kafkalib.Message) {
 		return
 	}
 
-	// Publish
+	// Publish to first topic (JSON format)
 	err = s.publishMessage(clientID, transformedJSON)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf("Failed to publish: %v", err))
 		s.metrics.IncrementFailed()
 		return
+	}
+
+	// Transform to proto and publish to second topic
+	protoPayload, err := transformer.TransformToProtoFromFlat(transformed)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf("Failed to transform to proto: %v", err))
+		// Continue even if proto fails - don't fail the whole message
+	} else {
+		err = s.publishProtoMessage(clientID, protoPayload)
+		if err != nil {
+			s.logger.Error(fmt.Sprintf("Failed to publish proto: %v", err))
+			// Continue even if proto publish fails
+		}
 	}
 
 	s.metrics.IncrementPublished()
@@ -260,6 +287,46 @@ func (s *TransformerService) publishMessage(clientID string, data []byte) error 
 	}
 
 	s.logger.Info(fmt.Sprintf("📤 Published to %s (client: %s)", s.config.DestinationTopic, clientID))
+	return nil
+}
+
+// publishProtoMessage sends protobuf message to akto.api.logs2 topic
+func (s *TransformerService) publishProtoMessage(clientID string, protoMsg interface{}) error {
+	// Import proto package is already done at the top
+	protoBytes, err := proto.Marshal(protoMsg.(proto.Message))
+	if err != nil {
+		return fmt.Errorf("failed to marshal proto message: %w", err)
+	}
+
+	protoTopic := "akto.api.logs2"
+	err = s.protoProducer.Produce(
+		&kafkalib.Message{
+			TopicPartition: kafkalib.TopicPartition{
+				Topic:     &protoTopic,
+				Partition: kafkalib.PartitionAny,
+			},
+			Key:   []byte(clientID),
+			Value: protoBytes,
+			Headers: []kafkalib.Header{
+				{Key: "client_id", Value: []byte(clientID)},
+				{Key: "content_type", Value: []byte("application/x-protobuf")},
+				{Key: "transformed_at", Value: []byte(time.Now().Format(time.RFC3339))},
+			},
+		},
+		nil, // No delivery callback - non-blocking
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to produce proto message to %s: %w", protoTopic, err)
+	}
+
+	// Flush to ensure message is queued
+	remaining := s.protoProducer.Flush(5000) // 5 second timeout
+	if remaining > 0 {
+		s.logger.Warn(fmt.Sprintf("⚠️  Warning: %d proto messages remained in queue after flush", remaining))
+	}
+
+	s.logger.Info(fmt.Sprintf("📤 Published proto to %s (client: %s, size: %d bytes)", protoTopic, clientID, len(protoBytes)))
 	return nil
 }
 
@@ -336,6 +403,7 @@ func (s *TransformerService) Stop(ctx context.Context) error {
 
 	s.consumer.Close()
 	s.producer.Close()
+	s.protoProducer.Close()
 
 	s.logger.Info("✅ Service stopped")
 	s.printMetrics()
